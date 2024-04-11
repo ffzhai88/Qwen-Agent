@@ -28,7 +28,7 @@ class FnCallAgent(Agent): ## 继承自 agent.py 中的agent class
               such as 'code_interpreter', {'name': 'code_interpreter', 'timeout': 10}, or CodeInterpreter(). ### agent中要用的那些工具。
             llm: The LLM model configuration or LLM model object.
               Set the configuration as {'model': '', 'api_key': '', 'model_server': ''}.  ## 配置LLM服务的相关参数
-            system_message: The specified system message for LLM chat. ## 暂时不知道什么位置使用
+            system_message: The specified system message for LLM chat. ##### 给LLM的初始message
             name: The name of this agent. 
             description: The description of this agent, which will be used for multi_agent.
             files: A file url list. The initialized files for the agent. ## 暂时不知道怎么使用
@@ -41,7 +41,7 @@ class FnCallAgent(Agent): ## 继承自 agent.py 中的agent class
 
         # Default to use Memory to manage files
         self.mem = Memory(llm=self.llm, files=files)
-
+    ### 重写Agent类的虚函数，其作用是基于给定的信息message，返回一个response generator
     def _run(self,
              messages: List[Message],
              lang: str = 'en',
@@ -51,7 +51,7 @@ class FnCallAgent(Agent): ## 继承自 agent.py 中的agent class
         response = []
         while True and num_llm_calls_available > 0:
             num_llm_calls_available -= 1
-            output_stream = self._call_llm(
+            output_stream = self._call_llm(   ### 基于给定的messages，为agent调用LLM的接口函数，返回LLM的response generator，函数中通过调用self.llm.chat(messages, functions)实现
                 messages=messages,
                 functions=[
                     func.function for func in self.function_map.values()
@@ -64,7 +64,7 @@ class FnCallAgent(Agent): ## 继承自 agent.py 中的agent class
                 response.extend(output)
                 messages.extend(output)
             use_tool, action, action_input, _ = self._detect_tool(response[-1])
-            if use_tool:
+            if use_tool:  ### 经过检查，确认LLM的判断是否调用工具，若是调用工具，则进行工具调用，并拿到工具调用的结果。 dectect_tool的作用只是检查message的function_call是否是None，而这个信息是由llm.chat调用生成message时，作为message类变量写入的。
                 observation = self._call_tool(action,
                                               action_input,
                                               messages=messages)
@@ -73,7 +73,7 @@ class FnCallAgent(Agent): ## 继承自 agent.py 中的agent class
                     name=action,
                     content=observation,
                 )
-                messages.append(fn_msg)
+                messages.append(fn_msg)   ## 调用工具的结果，添加到message和response列表中。
                 response.append(fn_msg)
                 yield response
             else:
@@ -85,13 +85,13 @@ class FnCallAgent(Agent): ## 继承自 agent.py 中的agent class
                    **kwargs) -> str:
         # Temporary plan: Check if it is necessary to transfer files to the tool
         # Todo: This should be changed to parameter passing, and the file URL should be determined by the model
-        if self.function_map[tool_name].file_access:
+        if self.function_map[tool_name].file_access:   ### 如果这个工具是要access文件的，需要把所有的文件作为参数传给工具
             assert 'messages' in kwargs
             files = self.mem.get_all_files_of_messages(
-                kwargs['messages']) + self.mem.system_files
+                kwargs['messages']) + self.mem.system_files   ### 获取所有相关的文件，一部分是memory中存放的系统文件，一部分是message中所有的文件
             return super()._call_tool(tool_name,
                                       tool_args,
                                       files=files,
                                       **kwargs)
         else:
-            return super()._call_tool(tool_name, tool_args, **kwargs)
+            return super()._call_tool(tool_name, tool_args, **kwargs)  ### 调用工具，拿到工具调用结果

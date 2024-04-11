@@ -10,7 +10,7 @@ from qwen_agent.tools import BaseTool
 MAX_LLM_CALL_PER_RUN = 8
 
 
-class FnCallAgent(Agent):
+class FnCallAgent(Agent): ## 继承自 agent.py 中的agent class
     """This is a widely applicable function call agent integrated with llm and tool use ability."""
 
     def __init__(self,
@@ -25,13 +25,13 @@ class FnCallAgent(Agent):
 
         Args:
             function_list: One list of tool name, tool configuration or Tool object,
-              such as 'code_interpreter', {'name': 'code_interpreter', 'timeout': 10}, or CodeInterpreter().
+              such as 'code_interpreter', {'name': 'code_interpreter', 'timeout': 10}, or CodeInterpreter(). ### agent中要用的那些工具。
             llm: The LLM model configuration or LLM model object.
-              Set the configuration as {'model': '', 'api_key': '', 'model_server': ''}.
-            system_message: The specified system message for LLM chat.
-            name: The name of this agent.
+              Set the configuration as {'model': '', 'api_key': '', 'model_server': ''}.  ## 配置LLM服务的相关参数
+            system_message: The specified system message for LLM chat. ## 暂时不知道什么位置使用
+            name: The name of this agent. 
             description: The description of this agent, which will be used for multi_agent.
-            files: A file url list. The initialized files for the agent.
+            files: A file url list. The initialized files for the agent. ## 暂时不知道怎么使用
         """
         super().__init__(function_list=function_list,
                          llm=llm,

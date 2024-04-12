@@ -16,7 +16,7 @@ class BaseFnCallModel(BaseChatModel, ABC):
         self.generate_cfg['stop'] = stop + [
             x for x in FN_STOP_WORDS if x not in stop
         ]
-
+    ## 实例化父类BaseChatModel的_chat_with_functions函数。这个函数由负类的chat()函数中的_call_model_service函数调用，针对需要进行function call的情况
     def _chat_with_functions(
         self,
         messages: List[Union[Message, Dict]],
@@ -63,7 +63,7 @@ class BaseFnCallModel(BaseChatModel, ABC):
     def _prepend_fncall_system(self, messages: List[Message],
                                functions: List[Dict]) -> List[Message]:
         tool_desc_template = FN_CALL_TEMPLATE['en']
-        for message in messages[::-1]:
+        for message in messages[::-1]:  ###倒序遍历所有的user message，如果有中文，则使用中文的工具function call模版，否则用英语
             if message.role in (USER, ):
                 if has_chinese_chars(message.content):
                     tool_desc_template = FN_CALL_TEMPLATE['zh']

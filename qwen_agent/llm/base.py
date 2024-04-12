@@ -74,18 +74,18 @@ class BaseChatModel(ABC):
         _return_message_type = 'dict'
         new_messages = []
         for msg in messages:
-            if isinstance(msg, dict):
+            if isinstance(msg, dict):  ### 统一入参messages的格式，如果是dict，将其转换为Message类，Message类是一个BaseModelCompatibleDict，其基础也是一个dict。但为什么要用dict作为基础类型呢？
                 new_messages.append(Message(**msg))
             else:
                 new_messages.append(msg)
                 _return_message_type = 'message'
         messages = new_messages
 
-        if messages[0].role != SYSTEM:
+        if messages[0].role != SYSTEM:   ### 一定保证第一条message是系统说的话。大模型说的话是ASSISTANT这个角色说的。
             messages = [Message(role=SYSTEM, content=DEFAULT_SYSTEM_MESSAGE)
                         ] + messages
 
-        messages = self._preprocess_messages(messages)
+        messages = self._preprocess_messages(messages) #### 统一message中content的格式，每条message中的content都是list[ContentItem]格式。
 
         if functions:
             fncall_mode = True
@@ -165,7 +165,7 @@ class BaseChatModel(ABC):
         raise NotImplementedError
 
     def _preprocess_messages(self, messages: List[Message]) -> List[Message]:
-        messages = self._format_as_multimodal_messages(messages)
+        messages = self._format_as_multimodal_messages(messages)  #### 统一message中content的格式，每条message中的content都是list[ContentItem]格式。
         return messages
 
     def _postprocess_messages(self, messages: List[Message],
@@ -213,24 +213,24 @@ class BaseChatModel(ABC):
             assert msg.role in (USER, ASSISTANT, SYSTEM, FUNCTION)
 
             content = []
-            if isinstance(msg.content, str):  # if text content
+            if isinstance(msg.content, str):  # if text content  ## message的content变量存放message的内容，可以是str类型，也可以是List[ContentItem]类型。也就是说，一条message可以包含多个内容，但对应的角色唯一，它可以一连串说多个事情（包括上传文件），都放到一个message中。
                 if msg.content:
-                    content = [ContentItem(text=msg.content)]
-            elif isinstance(msg.content, list):  # if multimodal content
+                    content = [ContentItem(text=msg.content)]   ### 每个ContentItem有三个元素，text，image，file，存放不同类型的message的内容。此处将str类型的content转换为list[ContentItem]类型，方便后续统一处理
+            elif isinstance(msg.content, list):  # if multimodal content   若message的content为list[ContentItem]类型，则其一般存放的是多模态内容
                 files = []
                 for item in msg.content:
-                    (k, v), = item.model_dump().items()
+                    (k, v), = item.model_dump().items()  ## item为ContentItem类型，是BaseModel的子类。model_dump()函数把整个类的信息dump到一个dict中。items()函数把dict的信息转换为可便利的(键，值)元组数组。再经过转换之后，k存放所有键值，v存放所有value值。
                     if k in ('box', 'text'):
                         content.append(ContentItem(text=v))
                     if k == 'image':
-                        content.append(item)
-                    if k in ('file', 'image'):
+                        content.append(item)  ## 如果是image content，则直接加入到最终的content中。
+                    if k in ('file', 'image'): ## 如果是image或file，全部放到files list中，后续对所有file进行处理。
                         files.append(v)
                 if (msg.role in (SYSTEM, USER)) and files:
-                    has_zh = has_chinese_chars(content)
+                    has_zh = has_chinese_chars(content)   ### 看所有的content中是否含有中文汉字
                     upload = []
-                    for f in [get_basename_from_url(f) for f in files]:
-                        if is_image(f):
+                    for f in [get_basename_from_url(f) for f in files]:  ## 遍历所有的基础文件名
+                        if is_image(f):   ### 若后缀是图片类型，例如jpg、JPEG、平、webp等
                             if has_zh:
                                 upload.append(f'![图片]({f})')
                             else:
@@ -242,14 +242,14 @@ class BaseChatModel(ABC):
                                 upload.append(f'[file]({f})')
                     upload = ' '.join(upload)
                     if has_zh:
-                        upload = f'（上传了 {upload}）\n\n'
+                        upload = f'（上传了 {upload}）\n\n'   ### 相当于遍历了所有的文件，告诉模型，已经上传完成了
                     else:
                         upload = f'(Uploaded {upload})\n\n'
-                    content = [ContentItem(text=upload)] + content
+                    content = [ContentItem(text=upload)] + content  ### 所有的文件合并上传之后，作为一个统一的contentItem加入到 message的content这个list中。也就是上传文件的过程作为一个message
             else:
                 raise TypeError
-
-            multimodal_messages.append(
+            ##### 用新产生的content生成一个新的message，相当于统一了message中content的格式，并添加了上传文件的操作。
+            multimodal_messages.append(  
                 Message(
                     role=msg.role,
                     content=content,

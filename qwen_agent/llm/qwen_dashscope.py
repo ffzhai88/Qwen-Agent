@@ -77,11 +77,11 @@ class QwenChatAtDS(BaseTextChatModel):
         messages = self._prepend_fncall_system(messages, functions)
 
         # Using text completion
-        prompt = self._build_text_completion_prompt(messages)
+        prompt = self._build_text_completion_prompt(messages)  ## 把message中的信息拼接成prompt，奇怪的是，这里只添加了一开始的SYSTEM message以及后续的USER、ASSISTANT message，而没有添加工具（角色为FUNCTION）相关的message
         if stream:
-            return self._text_completion_stream(prompt, delta_stream)
+            return self._text_completion_stream(prompt, delta_stream)   ## 流式生成，通过调用 dashscope.Generation.call 函数进行LLM调用
         else:
-            return self._text_completion_no_stream(prompt)
+            return self._text_completion_no_stream(prompt)  ##非流式生成，通过调用 dashscope.Generation.call 函数进行LLM调用
 
     def _text_completion_no_stream(
         self,
@@ -124,7 +124,7 @@ class QwenChatAtDS(BaseTextChatModel):
     def _build_text_completion_prompt(messages: List[Message]) -> str:
         im_start = '<|im_start|>'
         im_end = '<|im_end|>'
-        if messages[0].role == SYSTEM:
+        if messages[0].role == SYSTEM:   ### 首先拼接环境SYSTEM信息，包括初始的设置SYSTEM_MESSAGE，以及若使用工具，工具的总括说明
             sys = messages[0].content
             assert isinstance(sys, str)
             prompt = f'{im_start}{SYSTEM}\n{sys}{im_end}'

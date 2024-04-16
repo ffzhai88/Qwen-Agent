@@ -20,24 +20,24 @@ class BaseFnCallModel(BaseChatModel, ABC):
     def _chat_with_functions(
         self,
         messages: List[Union[Message, Dict]],
-        functions: List[Dict],
+        functions: List[Dict],     ### 此处为list类型，是因为在_run函数中调用agent._call_llm时，把agent.function_map转换为list作为入参输入
         stream: bool = True,
         delta_stream: bool = False
     ) -> Union[List[Message], Iterator[List[Message]]]:
         if delta_stream:
             raise NotImplementedError
 
-        messages = self._prepend_fncall_system(messages, functions)
+        messages = self._prepend_fncall_system(messages, functions) ### 在message序列中添加开始的工具总括说明，即告诉LLM有哪些工具可用，这些工具是干嘛用的，以及如何回复
 
-        # Simulate text completion with chat completion
+        # Simulate text completion with chat completion，如果最后一条message是机器人说的，那可能就是用户让LLM重新生成，因此新生成一个message，让模型重新生成
         if messages and messages[-1].role == ASSISTANT:
             assert len(messages) > 1 and messages[-2].role == USER
             assert messages[-1].function_call is None
             usr = messages[-2].content
             bot = messages[-1].content
-            if isinstance(usr, str) and isinstance(bot, str):
+            if isinstance(usr, str) and isinstance(bot, str):  ## 要么message中的content都是str类型，那就是纯文本，对应BaseTextChatModel 中的format_as_text_messages函数
                 usr = usr + '\n\n' + bot
-            elif isinstance(usr, list) and isinstance(bot, list):
+            elif isinstance(usr, list) and isinstance(bot, list):  ## 要么message中的content都是list类型，那就是可存放多模态信息，对应BaseChatModel 中的format_as_text_messages函数
                 usr = usr + [ContentItem(text='\n\n')] + bot
             else:
                 raise NotImplementedError
@@ -45,7 +45,7 @@ class BaseFnCallModel(BaseChatModel, ABC):
             text_to_complete.content = usr
             messages = messages[:-2] + [text_to_complete]
 
-        return self._chat(messages, stream=stream, delta_stream=delta_stream)
+        return self._chat(messages, stream=stream, delta_stream=delta_stream)  ## self._chat函数在其父类BaseChatModel中实现，基于是否流式生成分别调用self._chat_stream和self._chat_no_stream函数。
 
     def _preprocess_messages(self, messages: List[Message]) -> List[Message]:
         messages = super()._preprocess_messages(messages)
@@ -59,7 +59,7 @@ class BaseFnCallModel(BaseChatModel, ABC):
         if fncall_mode:
             messages = self._postprocess_fncall_messages(messages)
         return messages
-
+    ### 在message序列中添加开始的工具总括说明，即告诉LLM有哪些工具可用，这些工具是干嘛用的，以及如何回复
     def _prepend_fncall_system(self, messages: List[Message],
                                functions: List[Dict]) -> List[Message]:
         tool_desc_template = FN_CALL_TEMPLATE['en']
@@ -69,15 +69,15 @@ class BaseFnCallModel(BaseChatModel, ABC):
                     tool_desc_template = FN_CALL_TEMPLATE['zh']
                 break
         tool_descs = '\n\n'.join(
-            get_function_description(function) for function in functions)
+            get_function_description(function) for function in functions)  ## 获取所有工具的工具描述
         tool_names = ','.join(
             function.get('name', function.get('name_for_model', ''))
-            for function in functions)
+            for function in functions)  ### 获取所有工具的名称
         tool_system = tool_desc_template.format(tool_descs=tool_descs,
-                                                tool_names=tool_names)
+                                                tool_names=tool_names)  ## 构建初始输入给LLM的工具总括说明，相当于做环境初始化
 
         assert messages[0].role == SYSTEM
-        messages = copy.deepcopy(messages[:1]) + messages[1:]
+        messages = copy.deepcopy(messages[:1]) + messages[1:]  ## 新建一个message序列，并把工具总括说明添加到第一条message中，相当于环境告诉LLM有这些工具可用
         if isinstance(messages[0].content, str):
             messages[0].content += tool_system
         else:
